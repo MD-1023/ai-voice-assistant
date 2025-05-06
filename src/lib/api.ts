@@ -1,9 +1,9 @@
-
 import { toast } from "@/components/ui/sonner";
 
 // API configuration
 const DEEPGRAM_API_KEY = "0655664639c1a9b1d5adb9c9f1ed19cf10257348";
 const OPENAI_API_KEY = "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";
+const ELEVENLABS_API_KEY = "sk_daa1ffbe11bd110b007ac32fdcf02bcfb6ad74d7329becd3";
 
 // Define system prompt for OpenAI
 const SYSTEM_PROMPT = `
@@ -119,24 +119,28 @@ export const getAIResponse = async (messages: Message[]): Promise<string> => {
   }
 };
 
-// Text to speech with Deepgram
+// Text to speech with ElevenLabs
 export const textToSpeech = async (text: string): Promise<ArrayBuffer> => {
   try {
-    // Update the API endpoint to the correct one for text-to-speech
-    const response = await fetch("https://api.deepgram.com/v1/speak", {
+    const voice_id = "EXAVITQu4vr4xnSDxMaL"; // Using Sarah voice
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice_id}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Token ${DEEPGRAM_API_KEY}`
+        "xi-api-key": ELEVENLABS_API_KEY
       },
       body: JSON.stringify({
-        text: text,  // Ensure we're using the correct parameter name
-        voice: "asteria",  // Using just the voice name without model prefix
+        text: text,
+        model_id: "eleven_monolingual_v1",
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75
+        }
       })
     });
 
     if (!response.ok) {
-      console.error("Deepgram TTS error:", await response.text());
+      console.error("ElevenLabs TTS error:", await response.text());
       throw new Error(`Failed to convert text to speech: ${response.status}`);
     }
 
