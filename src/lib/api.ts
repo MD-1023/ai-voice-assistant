@@ -18,6 +18,7 @@ When helping users, follow these guidelines:
 - If the user asks about account details, ask for verification information first
 - Be empathetic and understanding
 - Remember information from previous exchanges in the conversation
+- Do not use special characters like asterisks or quotation marks in your responses as they will be spoken aloud
 `;
 
 // Interface for conversation history
@@ -119,22 +120,43 @@ export const getAIResponse = async (messages: Message[]): Promise<string> => {
   }
 };
 
+// Clean text for speech by removing special characters that shouldn't be spoken
+const cleanTextForSpeech = (text: string): string => {
+  // Remove asterisks (markdown bold/italics)
+  let cleanedText = text.replace(/\*/g, "");
+  
+  // Remove quotes that would be spoken
+  cleanedText = cleanedText.replace(/["']/g, "");
+  
+  // Remove markdown links and keep only the text
+  cleanedText = cleanedText.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  
+  // Remove other special characters that might be incorrectly spoken
+  cleanedText = cleanedText.replace(/[_#>`]/g, "");
+  
+  return cleanedText;
+};
+
 // Text to speech with ElevenLabs
 export const textToSpeech = async (text: string): Promise<ArrayBuffer> => {
   try {
+    const cleanedText = cleanTextForSpeech(text);
     const voice_id = "EXAVITQu4vr4xnSDxMaL"; // Using Sarah voice
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice_id}`, {
+    
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "xi-api-key": ELEVENLABS_API_KEY
       },
       body: JSON.stringify({
-        text: text,
-        model_id: "eleven_monolingual_v1",
+        text: cleanedText,
+        model_id: "eleven_turbo_v2", // Using the faster model for lower latency
         voice_settings: {
           stability: 0.5,
-          similarity_boost: 0.75
+          similarity_boost: 0.75,
+          style: 0.0,
+          use_speaker_boost: true
         }
       })
     });

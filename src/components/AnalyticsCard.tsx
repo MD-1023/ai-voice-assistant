@@ -41,6 +41,19 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
     value,
   })).sort((a, b) => b.value - a.value).slice(0, 6);
 
+  // Custom tooltip styles for better readability
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-background border border-border p-2 rounded-md shadow-md">
+          <p className="font-medium text-foreground">{payload[0].name}</p>
+          <p className="text-primary">{`${payload[0].value} queries`}</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -67,14 +80,14 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
+                <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Tooltip formatter={(value) => [`${value} queries`, ""]} />
               </PieChart>
             ) : (
               <BarChart data={chartData}>
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`${value} queries`, ""]} />
+                <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="value" fill="hsl(var(--primary))" />
               </BarChart>
             )}

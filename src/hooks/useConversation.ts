@@ -32,10 +32,11 @@ export function useConversation({ name, email }: UseConversationProps) {
     // Get the current/last conversation
     const currentConversation = userData.conversations[userData.conversations.length - 1];
     if (currentConversation) {
-      setMessages(currentConversation.messages);
-      
-      // If no messages yet, greet the user
-      if (currentConversation.messages.length === 0) {
+      // Set the existing messages
+      if (currentConversation.messages.length > 0) {
+        setMessages(currentConversation.messages);
+      } else {
+        // If no messages yet, greet the user
         const greeting = `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`;
         const greetingMessage: Message = { role: "assistant", content: greeting };
         

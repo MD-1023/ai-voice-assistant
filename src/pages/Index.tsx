@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +12,16 @@ const Index = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load previously used name and email
+  useEffect(() => {
+    const lastSession = localStorage.getItem("lastSession");
+    if (lastSession) {
+      const { name: savedName, email: savedEmail } = JSON.parse(lastSession);
+      setName(savedName || "");
+      setEmail(savedEmail || "");
+    }
+  }, []);
 
   const handleStartTalking = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +37,9 @@ const Index = () => {
     }
     
     setIsSubmitting(true);
+    
+    // Save current session
+    localStorage.setItem("lastSession", JSON.stringify({ name, email }));
     
     // Check if user exists or create new user
     let userData = getUserData(email);
