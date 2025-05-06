@@ -59,7 +59,7 @@ const Chat = () => {
       // If no messages yet, greet the user
       if (currentConversation.messages.length === 0) {
         const greeting = `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`;
-        const greetingMessage = { role: "assistant", content: greeting };
+        const greetingMessage: Message = { role: "assistant", content: greeting };
         
         setMessages([greetingMessage]);
         currentConversation.messages.push(greetingMessage);
@@ -150,13 +150,13 @@ const Chat = () => {
       }
       
       // Add user message
-      const userMessage = { role: "user", content: transcript };
+      const userMessage: Message = { role: "user", content: transcript };
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
       
       // Get AI response
       const aiResponseText = await getAIResponse(updatedMessages);
-      const assistantMessage = { role: "assistant", content: aiResponseText };
+      const assistantMessage: Message = { role: "assistant", content: aiResponseText };
       
       // Update messages with AI response
       setMessages([...updatedMessages, assistantMessage]);
