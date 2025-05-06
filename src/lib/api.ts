@@ -122,6 +122,7 @@ export const getAIResponse = async (messages: Message[]): Promise<string> => {
 // Text to speech with Deepgram
 export const textToSpeech = async (text: string): Promise<ArrayBuffer> => {
   try {
+    // Update the API endpoint to the correct one for text-to-speech
     const response = await fetch("https://api.deepgram.com/v1/speak", {
       method: "POST",
       headers: {
@@ -129,13 +130,13 @@ export const textToSpeech = async (text: string): Promise<ArrayBuffer> => {
         Authorization: `Token ${DEEPGRAM_API_KEY}`
       },
       body: JSON.stringify({
-        text,
-        voice: "aura-asteria-en",
-        model: "aura-asteria-en"
+        text: text,  // Ensure we're using the correct parameter name
+        voice: "asteria",  // Using just the voice name without model prefix
       })
     });
 
     if (!response.ok) {
+      console.error("Deepgram TTS error:", await response.text());
       throw new Error(`Failed to convert text to speech: ${response.status}`);
     }
 
