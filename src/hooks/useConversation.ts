@@ -32,11 +32,33 @@ export function useConversation({ name, email }: UseConversationProps) {
     // Get the current/last conversation
     const currentConversation = userData.conversations[userData.conversations.length - 1];
     if (currentConversation) {
-      // Set the existing messages
+      // If there are existing messages, check if this is a returning user
       if (currentConversation.messages.length > 0) {
         setMessages(currentConversation.messages);
+        
+        // Generate a welcome back message based on previous conversation
+        const previousTopics = extractConversationTopics(currentConversation.messages);
+        let welcomeBackMessage = `Hello ${name}!`;
+        
+        if (previousTopics.length > 0) {
+          welcomeBackMessage += ` I remember our previous conversation about ${previousTopics.join(", ")}. Would you like to continue that conversation or would you like assistance with something else?`;
+        } else {
+          welcomeBackMessage += ` I remember our previous conversation. Would you like to continue or would you like assistance with something else?`;
+        }
+        
+        const greetingMessage: Message = { role: "assistant", content: welcomeBackMessage };
+        const updatedMessages = [...currentConversation.messages, greetingMessage];
+        
+        setMessages(updatedMessages);
+        currentConversation.messages = updatedMessages;
+        saveUserData(userData);
+        
+        // Speak the welcome back message
+        setTimeout(() => {
+          speakText(welcomeBackMessage);
+        }, 300);
       } else {
-        // If no messages yet, greet the user
+        // If no messages yet, greet the user as new
         const greeting = `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`;
         const greetingMessage: Message = { role: "assistant", content: greeting };
         
@@ -52,6 +74,30 @@ export function useConversation({ name, email }: UseConversationProps) {
       return true;
     }
     return false;
+  };
+
+  // Extract main topics from previous conversation
+  const extractConversationTopics = (conversationMessages: Message[]): string[] => {
+    // Get only user messages
+    const userMessages = conversationMessages.filter(msg => msg.role === "user");
+    
+    if (userMessages.length === 0) return [];
+    
+    // Extract keywords from conversation
+    const keywords = ["password", "reset", "account", "login", "billing", "payment", "subscription", "cancel", "update", "problem"];
+    
+    // Find matches in the last message for simplicity
+    const lastMessage = userMessages[userMessages.length - 1].content.toLowerCase();
+    const detectedTopics = keywords.filter(keyword => lastMessage.includes(keyword));
+    
+    // If no specific topics detected, use generic description
+    if (detectedTopics.length === 0) {
+      // Try to get a simple topic from the last message
+      const simpleTopic = lastMessage.split(" ").slice(0, 3).join(" ");
+      return simpleTopic.length > 10 ? ["your previous questions"] : [`"${simpleTopic}..."`];
+    }
+    
+    return detectedTopics;
   };
 
   const handleAudioSubmission = async (audioBlob: Blob) => {
@@ -71,18 +117,28 @@ export function useConversation({ name, email }: UseConversationProps) {
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
       
+      // Prepare for speech before getting response to reduce latency
+      if (audioContextRef.current && audioContextRef.current.state !== 'running') {
+        try {
+          await audioContextRef.current.resume();
+        } catch (e) {
+          console.error("Error resuming audio context:", e);
+        }
+      }
+      
       // Get AI response
       const aiResponseText = await getAIResponse(updatedMessages);
       const assistantMessage: Message = { role: "assistant", content: aiResponseText };
       
       // Update messages with AI response
-      setMessages([...updatedMessages, assistantMessage]);
+      const finalMessages = [...updatedMessages, assistantMessage];
+      setMessages(finalMessages);
       
-      // Save conversation
+      // Save conversation immediately
       const userData = getUserData(email);
       if (userData) {
         const currentConversation = userData.conversations[userData.conversations.length - 1];
-        currentConversation.messages = [...updatedMessages, assistantMessage];
+        currentConversation.messages = finalMessages;
         saveUserData(userData);
       }
       
@@ -90,10 +146,9 @@ export function useConversation({ name, email }: UseConversationProps) {
       saveAnalytics(transcript, aiResponseText);
       saveFAQ(transcript, aiResponseText);
       
-      // Speak the response
-      await speakText(aiResponseText);
+      // Start speech synthesis immediately
+      speakText(aiResponseText);
       
-      setIsProcessing(false);
     } catch (error) {
       console.error("Error processing audio:", error);
       toast.error("Error processing your request. Please try again.");
@@ -133,6 +188,7 @@ export function useConversation({ name, email }: UseConversationProps) {
         
         audioSource.onended = () => {
           setIsSpeaking(false);
+          setIsProcessing(false);
           audioSourceRef.current = null;
         };
         
@@ -140,11 +196,13 @@ export function useConversation({ name, email }: UseConversationProps) {
       }, (err) => {
         console.error("Error decoding audio:", err);
         setIsSpeaking(false);
+        setIsProcessing(false);
         toast.error("Failed to play speech. Please try again.");
       });
     } catch (error) {
       console.error("Error playing speech:", error);
       setIsSpeaking(false);
+      setIsProcessing(false);
       toast.error("Failed to play speech. Please try again.");
     }
   };

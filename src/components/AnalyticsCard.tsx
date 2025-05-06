@@ -27,7 +27,8 @@ interface AnalyticsCardProps {
   type: "pie" | "bar";
 }
 
-const COLORS = ["#8b5cf6", "#ec4899", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"];
+// Updated color palette for better contrast and readability
+const COLORS = ["#8B5CF6", "#EC4899", "#06B6D4", "#10B981", "#F59E0B", "#EF4444"];
 
 const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
   title,
@@ -41,13 +42,13 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
     value,
   })).sort((a, b) => b.value - a.value).slice(0, 6);
 
-  // Custom tooltip styles for better readability
+  // Enhanced tooltip with better contrast and readability
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-background border border-border p-2 rounded-md shadow-md">
-          <p className="font-medium text-foreground">{payload[0].name}</p>
-          <p className="text-primary">{`${payload[0].value} queries`}</p>
+        <div className="bg-white border border-gray-200 p-3 rounded-md shadow-lg">
+          <p className="font-medium text-gray-900">{payload[0].name}</p>
+          <p className="text-primary font-semibold">{`${payload[0].value} ${payload[0].value === 1 ? 'query' : 'queries'}`}</p>
         </div>
       );
     }
@@ -55,13 +56,13 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
+    <Card className="w-full bg-card/90 border-border/40 shadow-md">
+      <CardHeader className="pb-2">
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="pt-4">
-        <div className="h-[200px]">
+      <CardContent className="pt-2">
+        <div className="h-[250px]">
           <ResponsiveContainer width="100%" height="100%">
             {type === "pie" ? (
               <PieChart>
@@ -77,18 +78,33 @@ const AnalyticsCard: React.FC<AnalyticsCardProps> = ({
                   label={({ name }) => name}
                 >
                   {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={COLORS[index % COLORS.length]} 
+                      stroke="white"
+                      strokeWidth={2}
+                    />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
+                <Legend layout="horizontal" verticalAlign="bottom" align="center" />
               </PieChart>
             ) : (
-              <BarChart data={chartData}>
-                <XAxis dataKey="name" />
-                <YAxis />
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 40 }}>
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fill: '#9CA3AF', fontSize: 12 }} 
+                  angle={-25}
+                  textAnchor="end"
+                  height={60}
+                />
+                <YAxis tick={{ fill: '#9CA3AF' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" fill="hsl(var(--primary))" />
+                <Bar 
+                  dataKey="value" 
+                  fill="#8B5CF6" 
+                  radius={[4, 4, 0, 0]}
+                />
               </BarChart>
             )}
           </ResponsiveContainer>
