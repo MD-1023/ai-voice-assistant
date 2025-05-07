@@ -155,11 +155,7 @@ const Index = () => {
                 className="w-full"
                 disabled={isSubmitting}
               >
-                {isSubmitting 
-                  ? "Starting..." 
-                  : isReturningUser 
-                    ? "Continue Conversation" 
-                    : "Start Talking"}
+                {isSubmitting ? "Starting..." : "Start Talking"}
               </Button>
             </form>
           </CardContent>
