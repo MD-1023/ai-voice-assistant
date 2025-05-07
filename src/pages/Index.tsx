@@ -174,10 +174,6 @@ const Index = () => {
           </CardContent>
         </Card>
       </div>
-      
-      <footer className="mt-8 text-muted-foreground text-center text-sm">
-        <p>Powered by Deepgram & OpenAI</p>
-      </footer>
     </div>
   );
 };

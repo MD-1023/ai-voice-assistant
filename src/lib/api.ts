@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/sonner";
 
 // API configuration
@@ -50,6 +49,7 @@ export const saveUserData = (userData: UserData): void => {
   }
   
   localStorage.setItem("aiAssistantUsers", JSON.stringify(existingUsers));
+  localStorage.setItem("conversation_history", JSON.stringify(userData.conversations));
   console.log("Saved user data:", userData);
 };
 
@@ -143,38 +143,73 @@ const cleanTextForSpeech = (text: string): string => {
   return cleanedText;
 };
 
-// Text to speech with ElevenLabs
+// Text to speech with ElevenLabs - modified to handle quota errors better
 export const textToSpeech = async (text: string): Promise<ArrayBuffer> => {
   try {
-    const cleanedText = cleanTextForSpeech(text);
-    const voice_id = "EXAVITQu4vr4xnSDxMaL"; // Using Sarah voice
-    
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "xi-api-key": ELEVENLABS_API_KEY
-      },
-      body: JSON.stringify({
-        text: cleanedText,
-        model_id: "eleven_turbo_v2", // Using the faster model for lower latency
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.0,
-          use_speaker_boost: true
+    // Fallback for ElevenLabs API issues - using browser's built-in TTS
+    const useFallbackTTS = (message: string): Promise<ArrayBuffer> => {
+      return new Promise((resolve) => {
+        const utterance = new SpeechSynthesisUtterance(message);
+        const voices = window.speechSynthesis.getVoices();
+        // Try to find a good voice
+        const preferredVoice = voices.find(voice => 
+          voice.name.includes('Female') || 
+          voice.name.includes('Google') || 
+          voice.name.includes('Samantha')
+        );
+        
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
         }
-      })
-    });
+        
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        window.speechSynthesis.speak(utterance);
+        
+        // Create a simple audio sample to return
+        const audioContext = new AudioContext();
+        const emptyBuffer = audioContext.createBuffer(1, 1, 22050);
+        const arrayBuffer = emptyBuffer.getChannelData(0).buffer;
+        resolve(arrayBuffer);
+      });
+    };
+    
+    try {
+      const cleanedText = cleanTextForSpeech(text);
+      const voice_id = "EXAVITQu4vr4xnSDxMaL"; // Using Sarah voice
+      
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice_id}/stream`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "xi-api-key": ELEVENLABS_API_KEY
+        },
+        body: JSON.stringify({
+          text: cleanedText,
+          model_id: "eleven_turbo_v2",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+            style: 0.0,
+            use_speaker_boost: true
+          }
+        })
+      });
 
-    if (!response.ok) {
-      console.error("ElevenLabs TTS error:", await response.text());
-      throw new Error(`Failed to convert text to speech: ${response.status}`);
+      if (!response.ok) {
+        console.error("ElevenLabs error, using fallback:", await response.text());
+        toast.info("Using browser's text-to-speech due to API limitations.");
+        return await useFallbackTTS(cleanedText);
+      }
+
+      return await response.arrayBuffer();
+    } catch (error) {
+      console.error("Error with ElevenLabs, using fallback:", error);
+      toast.info("Using browser's text-to-speech due to API limitations.");
+      return await useFallbackTTS(text);
     }
-
-    return await response.arrayBuffer();
   } catch (error) {
-    console.error("Error converting text to speech:", error);
+    console.error("Text-to-speech completely failed:", error);
     toast.error("Failed to generate speech. Please try again.");
     throw error;
   }
@@ -238,4 +273,55 @@ export const saveFAQ = (question: string, answer: string): void => {
 export const getFAQs = () => {
   const faqData = localStorage.getItem("aiAssistantFAQs");
   return faqData ? JSON.parse(faqData) : [];
+};
+
+// Extract topics from user messages - similar to the provided code
+export const extractTopicsFromMessages = (messages: Message[]): string[] => {
+  // Get only user messages
+  const userMessages = messages.filter(msg => msg.role === "user").slice(-3);
+  
+  if (userMessages.length === 0) return [];
+  
+  // Define keywords for topics detection
+  const topicKeywords: Record<string, string> = {
+    "weather": "the weather forecast",
+    "calendar": "your calendar",
+    "email": "email communications",
+    "send": "sending information",
+    "renewable": "renewable energy",
+    "energy": "energy topics",
+    "time": "time management",
+    "management": "management strategies",
+    "meeting": "scheduling meetings",
+    "book": "booking appointments",
+    "password": "password reset",
+    "reset": "account resets",
+    "account": "account management",
+    "login": "login issues",
+    "billing": "billing questions",
+    "payment": "payment methods",
+    "subscription": "subscription details",
+    "cancel": "cancellation procedures",
+    "update": "account updates",
+    "problem": "technical issues",
+    "help": "customer support",
+    "question": "general inquiries"
+  };
+  
+  // Extract topics from user messages
+  const topics = userMessages.map(msg => {
+    const content = msg.content.toLowerCase();
+    
+    // Check for each keyword
+    for (const [keyword, topic] of Object.entries(topicKeywords)) {
+      if (content.includes(keyword)) {
+        return topic;
+      }
+    }
+    
+    return "various topics";
+  });
+  
+  // Get unique topics
+  return Array.from(new Set(topics));
 };

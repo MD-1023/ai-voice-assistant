@@ -7,6 +7,7 @@ import {
   saveUserData,
   saveAnalytics,
   saveFAQ,
+  extractTopicsFromMessages,
   Message
 } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
@@ -22,117 +23,82 @@ export function useConversation({ name, email }: UseConversationProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const previousTopicsRef = useRef<string[]>([]);
+  const messageQueueRef = useRef<string[]>([]);
+  const conversationIdRef = useRef<string>(Date.now().toString());
 
   // Load or initialize conversation
   const loadConversation = () => {
-    const userData = getUserData(email);
-    if (!userData) return false;
+    // Create a base greeting
+    let greeting = `Hello ${name}! I'm your AI Voice Assistant.`;
     
-    // Get the current/last conversation
-    const currentConversation = userData.conversations[userData.conversations.length - 1];
-    if (currentConversation) {
-      // Check if this is a returning user with existing conversations
-      if (currentConversation.messages.length > 0) {
-        // Extract conversation messages excluding system messages
-        const actualMessages = currentConversation.messages.filter(
-          msg => msg.role !== "system"
-        );
+    // Get conversation history
+    const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+    let hasFoundPreviousConversation = false;
+    
+    // Find the most recent conversation for this user
+    for (let i = history.length - 1; i >= 0; i--) {
+      const conv = history[i];
+      if (conv.messages && conv.messages.some((msg: Message) => 
+        msg.role === "assistant" && 
+        msg.content && 
+        msg.content.includes(`Hello ${name}!`)
+      )) {
+        // Extract user messages
+        const userMessages = conv.messages.filter((msg: Message) => msg.role === "user");
         
-        // Save the actual conversation messages but don't display yet
-        if (actualMessages.length > 0) {
-          setMessages([]);
-          previousTopicsRef.current = extractConversationTopics(actualMessages);
+        if (userMessages.length > 0) {
+          // Get topics from previous conversations
+          const topics = extractTopicsFromMessages(userMessages);
           
-          // Generate personalized welcome back message
-          let welcomeBackMessage = `Hello ${name}! I remember our previous conversation`;
-          
-          if (previousTopicsRef.current.length > 0) {
-            welcomeBackMessage += ` about ${previousTopicsRef.current.join(", ")}. Would you like to continue that conversation or would you like assistance with something else?`;
-          } else {
-            welcomeBackMessage += `. Would you like to continue where we left off or would you like assistance with something else?`;
+          if (topics.length > 0) {
+            greeting = `Hello ${name}! I remember our previous conversation about ${topics.join(" and ")}. Would you like to continue that conversation?`;
+            hasFoundPreviousConversation = true;
           }
-          
-          const greetingMessage: Message = { role: "assistant", content: welcomeBackMessage };
-          
-          // Display only the greeting message to the user
-          setMessages([greetingMessage]);
-          
-          // Speak the welcome back message
-          setTimeout(() => {
-            speakText(welcomeBackMessage);
-          }, 300);
-          
-          return true;
+        }
+        break;
+      }
+    }
+    
+    // If no previous conversation was found or no topics extracted, use the basic greeting
+    if (!hasFoundPreviousConversation) {
+      greeting += " How can I help you today?";
+    }
+    
+    // Create greeting message and set it
+    const greetingMessage: Message = { role: "assistant", content: greeting };
+    setMessages([greetingMessage]);
+    
+    // Save this in user data if needed
+    const userData = getUserData(email);
+    if (userData) {
+      // Get the current/last conversation
+      if (userData.conversations.length === 0) {
+        userData.conversations.push({
+          date: new Date().toISOString(),
+          messages: [greetingMessage]
+        });
+        saveUserData(userData);
+      } else {
+        // Update the last conversation
+        const lastConv = userData.conversations[userData.conversations.length - 1];
+        
+        // If last conversation already has non-system messages, create a new conversation
+        if (lastConv.messages.filter(msg => msg.role !== "system").length > 0) {
+          userData.conversations.push({
+            date: new Date().toISOString(),
+            messages: [greetingMessage]
+          });
+          saveUserData(userData);
         }
       }
-      
-      // If no messages yet, greet the user as new
-      const greeting = `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`;
-      const greetingMessage: Message = { role: "assistant", content: greeting };
-      
-      setMessages([greetingMessage]);
-      currentConversation.messages.push(greetingMessage);
-      saveUserData(userData);
-      
-      // Speak the greeting
-      setTimeout(() => {
-        speakText(greeting);
-      }, 300);
-      
-      return true;
-    }
-    return false;
-  };
-
-  // Extract main topics from previous conversation
-  const extractConversationTopics = (conversationMessages: Message[]): string[] => {
-    // Get only user messages
-    const userMessages = conversationMessages.filter(msg => msg.role === "user");
-    
-    if (userMessages.length === 0) return [];
-    
-    // Define keywords that represent common topics
-    const keywordMap: Record<string, string> = {
-      "password": "password reset",
-      "reset": "account resets",
-      "account": "account management",
-      "login": "login issues",
-      "billing": "billing questions",
-      "payment": "payment methods",
-      "subscription": "subscription details",
-      "cancel": "cancellation procedures",
-      "update": "account updates",
-      "problem": "technical issues",
-      "help": "customer support",
-      "question": "general inquiries",
-      "email": "email settings"
-    };
-    
-    const detectedTopics: string[] = [];
-    
-    // Look through all messages for keywords
-    userMessages.forEach(message => {
-      const messageContent = message.content.toLowerCase();
-      
-      // Check for each keyword in the message
-      Object.entries(keywordMap).forEach(([keyword, topic]) => {
-        if (messageContent.includes(keyword) && !detectedTopics.includes(topic)) {
-          detectedTopics.push(topic);
-        }
-      });
-    });
-    
-    // If no specific topics detected, use the last message content
-    if (detectedTopics.length === 0 && userMessages.length > 0) {
-      const lastMessage = userMessages[userMessages.length - 1].content;
-      // Get first 3-5 words as a topic
-      const words = lastMessage.split(" ");
-      const simpleTopic = words.slice(0, Math.min(5, words.length)).join(" ");
-      return ['"' + simpleTopic + '..."'];
     }
     
-    return detectedTopics.slice(0, 3); // Limit to 3 topics max
+    // Speak the greeting
+    setTimeout(() => {
+      speakText(greeting);
+    }, 300);
+    
+    return true;
   };
 
   const handleAudioSubmission = async (audioBlob: Blob) => {
@@ -166,8 +132,8 @@ export function useConversation({ name, email }: UseConversationProps) {
         // Filter out the greeting message when sending to AI
         updatedMessages.filter(msg => 
           !(msg.role === "assistant" && 
-            (msg.content.startsWith(`Hello ${name}! I remember`) || 
-             msg.content === `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`))
+            (msg.content.includes(`Hello ${name}! I remember`) || 
+             msg.content === `Hello ${name}! I'm your AI Voice Assistant. How can I help you today?`))
         )
       );
       const assistantMessage: Message = { role: "assistant", content: aiResponseText };
@@ -176,14 +142,17 @@ export function useConversation({ name, email }: UseConversationProps) {
       const finalMessages = [...updatedMessages, assistantMessage];
       setMessages(finalMessages);
       
-      // Save conversation immediately, but exclude the welcome back greeting
+      // Save conversation to localStorage
+      saveConversationToLocalStorage(finalMessages);
+      
+      // Save user data
       const userData = getUserData(email);
       if (userData) {
         const currentConversation = userData.conversations[userData.conversations.length - 1];
         
-        // Store all messages except the welcome back greeting
+        // Store all messages except the welcome back greeting if it exists
         const messagesToStore = finalMessages.filter(msg => 
-          !(msg.role === "assistant" && msg.content.startsWith(`Hello ${name}! I remember`))
+          !(msg.role === "assistant" && msg.content.includes(`Hello ${name}! I remember`))
         );
         
         currentConversation.messages = messagesToStore;
@@ -204,12 +173,58 @@ export function useConversation({ name, email }: UseConversationProps) {
     }
   };
 
+  const saveConversationToLocalStorage = (messages: Message[]) => {
+    // Get existing history
+    const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+    
+    // Check if we need to create a new conversation or update existing
+    let currentConversation = history.find((conv: any) => conv.id === conversationIdRef.current);
+    
+    if (!currentConversation) {
+      currentConversation = {
+        id: conversationIdRef.current,
+        date: new Date().toISOString(),
+        messages: messages
+      };
+      history.push(currentConversation);
+    } else {
+      currentConversation.messages = messages;
+    }
+    
+    // Save back to localStorage
+    localStorage.setItem("conversation_history", JSON.stringify(history));
+    
+    // Update total conversations counter
+    const totalConversations = localStorage.getItem("total_conversations") || "0";
+    localStorage.setItem("total_conversations", (parseInt(totalConversations) + 1).toString());
+  };
+
   const speakText = async (text: string) => {
     try {
       setIsSpeaking(true);
       
+      // Add to message queue
+      messageQueueRef.current.push(text);
+      processMessageQueue();
+    } catch (error) {
+      console.error("Error in speak text:", error);
+      setIsSpeaking(false);
+      setIsProcessing(false);
+      toast.error("Failed to play speech. Please try again.");
+    }
+  };
+  
+  const processMessageQueue = async () => {
+    if (messageQueueRef.current.length === 0 || isSpeaking) {
+      return;
+    }
+    
+    try {
+      setIsSpeaking(true);
+      const textToSpeak = messageQueueRef.current.shift() as string;
+      
       // Clean text for speech by removing special characters that shouldn't be spoken
-      const cleanedText = cleanTextForSpeech(text);
+      const cleanedText = cleanTextForSpeech(textToSpeak);
       
       // Get speech audio
       const audioBuffer = await textToSpeech(cleanedText);
@@ -241,6 +256,11 @@ export function useConversation({ name, email }: UseConversationProps) {
           setIsSpeaking(false);
           setIsProcessing(false);
           audioSourceRef.current = null;
+          
+          // Process next message in queue if available
+          if (messageQueueRef.current.length > 0) {
+            setTimeout(() => processMessageQueue(), 300);
+          }
         };
         
         audioSource.start();
@@ -248,13 +268,21 @@ export function useConversation({ name, email }: UseConversationProps) {
         console.error("Error decoding audio:", err);
         setIsSpeaking(false);
         setIsProcessing(false);
-        toast.error("Failed to play speech. Please try again.");
+        
+        // Process next message in queue if available
+        if (messageQueueRef.current.length > 0) {
+          setTimeout(() => processMessageQueue(), 300);
+        }
       });
     } catch (error) {
       console.error("Error playing speech:", error);
       setIsSpeaking(false);
       setIsProcessing(false);
-      toast.error("Failed to play speech. Please try again.");
+      
+      // Process next message in queue if available
+      if (messageQueueRef.current.length > 0) {
+        setTimeout(() => processMessageQueue(), 300);
+      }
     }
   };
   
