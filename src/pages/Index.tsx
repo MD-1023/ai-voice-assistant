@@ -30,17 +30,21 @@ const Index = () => {
   
   // Helper function to check if a user is returning with conversations
   const checkIfReturningUser = (email: string) => {
-    const userData = getUserData(email);
-    if (userData) {
-      // Check if there are any actual conversations with messages
-      const hasConversations = userData.conversations.some(conversation => 
-        conversation.messages.filter(msg => msg.role !== "system").length > 0
+    if (!email) return;
+    
+    // Check conversation history directly
+    const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+    
+    // Look for user's previous conversations in history
+    const hasConversations = history.some((conv: any) => {
+      return conv.messages && conv.messages.some((msg: any) => 
+        msg.role === "assistant" && 
+        msg.content && 
+        msg.content.includes(`Hello ${name}!`)
       );
-      
-      setIsReturningUser(hasConversations);
-    } else {
-      setIsReturningUser(false);
-    }
+    });
+    
+    setIsReturningUser(hasConversations);
   };
 
   const handleStartTalking = (e: React.FormEvent) => {
@@ -108,6 +112,15 @@ const Index = () => {
     setEmail(newEmail);
     checkIfReturningUser(newEmail);
   };
+  
+  // When name changes, check if combination creates a returning user
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setName(newName);
+    if (email) {
+      checkIfReturningUser(email);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 sm:p-6 relative">
@@ -146,7 +159,7 @@ const Index = () => {
                   id="name"
                   placeholder="John Smith"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={handleNameChange}
                   required
                 />
               </div>

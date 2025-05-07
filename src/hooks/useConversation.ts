@@ -28,77 +28,118 @@ export function useConversation({ name, email }: UseConversationProps) {
 
   // Load or initialize conversation
   const loadConversation = () => {
-    // Create a base greeting
-    let greeting = `Hello ${name}! I'm your AI Voice Assistant.`;
-    
-    // Get conversation history
-    const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
-    let hasFoundPreviousConversation = false;
-    
-    // Find the most recent conversation for this user
-    for (let i = history.length - 1; i >= 0; i--) {
-      const conv = history[i];
-      if (conv.messages && conv.messages.some((msg: Message) => 
-        msg.role === "assistant" && 
-        msg.content && 
-        msg.content.includes(`Hello ${name}!`)
-      )) {
-        // Extract user messages
-        const userMessages = conv.messages.filter((msg: Message) => msg.role === "user");
-        
-        if (userMessages.length > 0) {
-          // Get topics from previous conversations
-          const topics = extractTopicsFromMessages(userMessages);
-          
-          if (topics.length > 0) {
-            greeting = `Hello ${name}! I remember our previous conversation about ${topics.join(" and ")}. Would you like to continue that conversation?`;
-            hasFoundPreviousConversation = true;
+    if (!email) return false;
+
+    try {
+      // Get conversation history
+      const history = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+      
+      // Create a base greeting
+      let greeting = `Hello ${name}! I'm your AI Voice Assistant.`;
+      let hasFoundPreviousConversation = false;
+      
+      // Find the most recent conversation for this user
+      for (let i = history.length - 1; i >= 0; i--) {
+        const conv = history[i];
+        if (conv.messages && conv.messages.some((msg: Message) => 
+          msg.role === "assistant" && 
+          msg.content && 
+          msg.content.includes(`Hello ${name}!`)
+        )) {
+          // Extract user messages
+          const userMessages = conv.messages
+            .filter((msg: Message) => msg.role === "user")
+            .slice(-3); // Get the last 3 user messages
+            
+          if (userMessages.length > 0) {
+            // Get topics from previous conversations
+            const topics = userMessages.map((msg: Message) => {
+              const content = msg.content.toLowerCase();
+              if (content.includes("weather")) return "the weather forecast";
+              if (content.includes("calendar")) return "your calendar";
+              if (content.includes("email") || content.includes("send")) return "sending information to your email";
+              if (content.includes("renewable energy")) return "renewable energy developments";
+              if (content.includes("time management")) return "time management techniques";
+              if (content.includes("meeting") || content.includes("book")) return "booking a meeting";
+              return "various topics";
+            });
+            
+            // Get unique topics and filter out "various topics" if there are other specific topics
+            const uniqueTopics = Array.from(new Set(topics)).filter(topic => 
+              topics.some(t => t !== "various topics") ? topic !== "various topics" : true
+            );
+            
+            if (uniqueTopics.length > 0) {
+              greeting = `Hello ${name}! I remember our previous conversation about ${uniqueTopics.join(" and ")}. Would you like to continue that conversation?`;
+              hasFoundPreviousConversation = true;
+            }
           }
+          break;
         }
-        break;
       }
-    }
-    
-    // If no previous conversation was found or no topics extracted, use the basic greeting
-    if (!hasFoundPreviousConversation) {
-      greeting += " How can I help you today?";
-    }
-    
-    // Create greeting message and set it
-    const greetingMessage: Message = { role: "assistant", content: greeting };
-    setMessages([greetingMessage]);
-    
-    // Save this in user data if needed
-    const userData = getUserData(email);
-    if (userData) {
-      // Get the current/last conversation
-      if (userData.conversations.length === 0) {
-        userData.conversations.push({
-          date: new Date().toISOString(),
-          messages: [greetingMessage]
-        });
-        saveUserData(userData);
-      } else {
-        // Update the last conversation
-        const lastConv = userData.conversations[userData.conversations.length - 1];
-        
-        // If last conversation already has non-system messages, create a new conversation
-        if (lastConv.messages.filter(msg => msg.role !== "system").length > 0) {
+      
+      // If no previous conversation was found or no topics extracted, use the basic greeting
+      if (!hasFoundPreviousConversation) {
+        greeting += " How can I help you today?";
+      }
+      
+      // Create greeting message and set it
+      const greetingMessage: Message = { role: "assistant", content: greeting };
+      setMessages([greetingMessage]);
+      
+      // Save this in user data
+      const userData = getUserData(email);
+      if (userData) {
+        if (userData.conversations.length === 0) {
           userData.conversations.push({
             date: new Date().toISOString(),
             messages: [greetingMessage]
           });
-          saveUserData(userData);
+        } else {
+          // If last conversation has non-system messages, create a new one
+          const lastConv = userData.conversations[userData.conversations.length - 1];
+          const hasNonSystemMessages = lastConv.messages.some(msg => msg.role !== "system");
+          
+          if (hasNonSystemMessages) {
+            userData.conversations.push({
+              date: new Date().toISOString(),
+              messages: [greetingMessage]
+            });
+          } else {
+            // Update last conversation with new greeting
+            lastConv.messages = [greetingMessage];
+          }
         }
+        saveUserData(userData);
       }
+      
+      // Store this conversation in history
+      const conversationHistory = JSON.parse(localStorage.getItem("conversation_history") || "[]");
+      const existingConvIndex = conversationHistory.findIndex((conv: any) => conv.id === conversationIdRef.current);
+      
+      if (existingConvIndex >= 0) {
+        conversationHistory[existingConvIndex].messages = [greetingMessage];
+      } else {
+        const newConversation = {
+          id: conversationIdRef.current,
+          date: new Date().toISOString(),
+          messages: [greetingMessage]
+        };
+        conversationHistory.push(newConversation);
+      }
+      
+      localStorage.setItem("conversation_history", JSON.stringify(conversationHistory));
+      
+      // Speak the greeting
+      setTimeout(() => {
+        speakText(greeting);
+      }, 300);
+      
+      return true;
+    } catch (error) {
+      console.error("Error loading conversation:", error);
+      return false;
     }
-    
-    // Speak the greeting
-    setTimeout(() => {
-      speakText(greeting);
-    }, 300);
-    
-    return true;
   };
 
   const handleAudioSubmission = async (audioBlob: Blob) => {
