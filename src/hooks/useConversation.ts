@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { 
   transcribeAudio, 
@@ -23,6 +22,7 @@ export function useConversation({ name, email }: UseConversationProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const previousTopicsRef = useRef<string[]>([]);
 
   // Load or initialize conversation
   const loadConversation = () => {
@@ -34,29 +34,36 @@ export function useConversation({ name, email }: UseConversationProps) {
     if (currentConversation) {
       // If there are existing messages, check if this is a returning user
       if (currentConversation.messages.length > 0) {
-        setMessages(currentConversation.messages);
+        // Extract the actual conversation messages (excluding the greeting)
+        const actualMessages = currentConversation.messages.filter(
+          msg => !(msg.role === "assistant" && msg.content.startsWith(`Hello ${name}`))
+        );
+        
+        setMessages(actualMessages);
         
         // Generate a welcome back message based on previous conversation
-        const previousTopics = extractConversationTopics(currentConversation.messages);
-        let welcomeBackMessage = `Hello ${name}!`;
+        const previousTopics = extractConversationTopics(actualMessages);
+        previousTopicsRef.current = previousTopics;
+        
+        let welcomeBackMessage = `Hello ${name}! I remember our previous conversation`;
         
         if (previousTopics.length > 0) {
-          welcomeBackMessage += ` I remember our previous conversation about ${previousTopics.join(", ")}. Would you like to continue that conversation or would you like assistance with something else?`;
+          welcomeBackMessage += ` about ${previousTopics.join(", ")}. Would you like to continue that conversation or would you like assistance with something else?`;
         } else {
-          welcomeBackMessage += ` I remember our previous conversation. Would you like to continue or would you like assistance with something else?`;
+          welcomeBackMessage += `. Would you like to continue where we left off or would you like assistance with something else?`;
         }
         
         const greetingMessage: Message = { role: "assistant", content: welcomeBackMessage };
-        const updatedMessages = [...currentConversation.messages, greetingMessage];
         
-        setMessages(updatedMessages);
-        currentConversation.messages = updatedMessages;
-        saveUserData(userData);
+        // Add greeting to UI messages but don't modify stored messages yet
+        setMessages(prevMessages => [greetingMessage, ...actualMessages]);
         
         // Speak the welcome back message
         setTimeout(() => {
           speakText(welcomeBackMessage);
         }, 300);
+        
+        return true;
       } else {
         // If no messages yet, greet the user as new
         const greeting = `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`;
@@ -70,8 +77,9 @@ export function useConversation({ name, email }: UseConversationProps) {
         setTimeout(() => {
           speakText(greeting);
         }, 300);
+        
+        return true;
       }
-      return true;
     }
     return false;
   };
@@ -86,15 +94,25 @@ export function useConversation({ name, email }: UseConversationProps) {
     // Extract keywords from conversation
     const keywords = ["password", "reset", "account", "login", "billing", "payment", "subscription", "cancel", "update", "problem"];
     
-    // Find matches in the last message for simplicity
-    const lastMessage = userMessages[userMessages.length - 1].content.toLowerCase();
-    const detectedTopics = keywords.filter(keyword => lastMessage.includes(keyword));
+    const detectedTopics: string[] = [];
     
-    // If no specific topics detected, use generic description
+    // Look through all messages for keywords
+    userMessages.forEach(message => {
+      const messageContent = message.content.toLowerCase();
+      keywords.forEach(keyword => {
+        if (messageContent.includes(keyword) && !detectedTopics.includes(keyword)) {
+          detectedTopics.push(keyword);
+        }
+      });
+    });
+    
+    // If no specific topics detected, use the last message content
     if (detectedTopics.length === 0) {
-      // Try to get a simple topic from the last message
-      const simpleTopic = lastMessage.split(" ").slice(0, 3).join(" ");
-      return simpleTopic.length > 10 ? ["your previous questions"] : [`"${simpleTopic}..."`];
+      const lastMessage = userMessages[userMessages.length - 1].content;
+      // Get first 3-5 words as a topic
+      const words = lastMessage.split(" ");
+      const simpleTopic = words.slice(0, Math.min(5, words.length)).join(" ");
+      return ['"' + simpleTopic + '..."'];
     }
     
     return detectedTopics;
@@ -127,18 +145,31 @@ export function useConversation({ name, email }: UseConversationProps) {
       }
       
       // Get AI response
-      const aiResponseText = await getAIResponse(updatedMessages);
+      const aiResponseText = await getAIResponse(
+        // Filter out the greeting message when sending to AI
+        updatedMessages.filter(msg => 
+          !(msg.role === "assistant" && 
+            (msg.content.startsWith(`Hello ${name}! I remember`) || 
+             msg.content === `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`))
+        )
+      );
       const assistantMessage: Message = { role: "assistant", content: aiResponseText };
       
       // Update messages with AI response
       const finalMessages = [...updatedMessages, assistantMessage];
       setMessages(finalMessages);
       
-      // Save conversation immediately
+      // Save conversation immediately, but exclude the welcome back greeting
       const userData = getUserData(email);
       if (userData) {
         const currentConversation = userData.conversations[userData.conversations.length - 1];
-        currentConversation.messages = finalMessages;
+        
+        // Store all messages except the welcome back greeting
+        const messagesToStore = finalMessages.filter(msg => 
+          !(msg.role === "assistant" && msg.content.startsWith(`Hello ${name}! I remember`))
+        );
+        
+        currentConversation.messages = messagesToStore;
         saveUserData(userData);
       }
       
@@ -160,8 +191,11 @@ export function useConversation({ name, email }: UseConversationProps) {
     try {
       setIsSpeaking(true);
       
+      // Clean text for speech by removing special characters that shouldn't be spoken
+      const cleanedText = cleanTextForSpeech(text);
+      
       // Get speech audio
-      const audioBuffer = await textToSpeech(text);
+      const audioBuffer = await textToSpeech(cleanedText);
       
       // Play the audio
       if (!audioContextRef.current) {
@@ -205,6 +239,23 @@ export function useConversation({ name, email }: UseConversationProps) {
       setIsProcessing(false);
       toast.error("Failed to play speech. Please try again.");
     }
+  };
+  
+  // Clean text for speech by removing special characters that shouldn't be spoken
+  const cleanTextForSpeech = (text: string): string => {
+    // Remove asterisks (markdown bold/italics)
+    let cleanedText = text.replace(/\*/g, "");
+    
+    // Remove quotes that would be spoken
+    cleanedText = cleanedText.replace(/["']/g, "");
+    
+    // Remove markdown links and keep only the text
+    cleanedText = cleanedText.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+    
+    // Remove other special characters that might be incorrectly spoken
+    cleanedText = cleanedText.replace(/[_#>`]/g, "");
+    
+    return cleanedText;
   };
 
   const cleanup = () => {

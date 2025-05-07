@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ const Index = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReturningUser, setIsReturningUser] = useState(false);
 
   // Load previously used name and email
   useEffect(() => {
@@ -20,6 +22,13 @@ const Index = () => {
       const { name: savedName, email: savedEmail } = JSON.parse(lastSession);
       setName(savedName || "");
       setEmail(savedEmail || "");
+      
+      // Check if this is a returning user with existing conversations
+      const userData = getUserData(savedEmail);
+      if (userData && userData.conversations.length > 0 && 
+          userData.conversations[userData.conversations.length - 1].messages.length > 0) {
+        setIsReturningUser(true);
+      }
     }
   }, []);
 
@@ -100,9 +109,11 @@ const Index = () => {
         
         <Card className="border border-border/40 bg-card/30 backdrop-blur-sm">
           <CardHeader>
-            <CardTitle>Welcome</CardTitle>
+            <CardTitle>Welcome{isReturningUser ? " Back" : ""}</CardTitle>
             <CardDescription>
-              Enter your details below to start a conversation with your AI assistant
+              {isReturningUser 
+                ? "Continue your conversation with your AI assistant"
+                : "Enter your details below to start a conversation with your AI assistant"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -125,7 +136,16 @@ const Index = () => {
                   type="email"
                   placeholder="john.smith@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    // Check if this is a returning user
+                    const userData = getUserData(e.target.value);
+                    setIsReturningUser(
+                      userData !== undefined && 
+                      userData.conversations.length > 0 && 
+                      userData.conversations[userData.conversations.length - 1].messages.length > 0
+                    );
+                  }}
                   required
                 />
               </div>
@@ -135,7 +155,11 @@ const Index = () => {
                 className="w-full"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Starting..." : "Start Talking"}
+                {isSubmitting 
+                  ? "Starting..." 
+                  : isReturningUser 
+                    ? "Continue Conversation" 
+                    : "Start Talking"}
               </Button>
             </form>
           </CardContent>

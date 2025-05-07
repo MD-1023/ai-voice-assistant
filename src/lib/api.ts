@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/sonner";
 
 // API configuration
@@ -49,6 +50,7 @@ export const saveUserData = (userData: UserData): void => {
   }
   
   localStorage.setItem("aiAssistantUsers", JSON.stringify(existingUsers));
+  console.log("Saved user data:", userData);
 };
 
 // Get all users data
@@ -60,7 +62,9 @@ export const getUsersData = (): UserData[] => {
 // Get specific user data
 export const getUserData = (email: string): UserData | undefined => {
   const users = getUsersData();
-  return users.find(user => user.email === email);
+  const userData = users.find(user => user.email === email);
+  console.log("Retrieved user data for email:", email, userData);
+  return userData;
 };
 
 // Speech to text with Deepgram
