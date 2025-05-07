@@ -61,9 +61,11 @@ export const getUsersData = (): UserData[] => {
 
 // Get specific user data
 export const getUserData = (email: string): UserData | undefined => {
+  if (!email) return undefined;
+  
   const users = getUsersData();
-  const userData = users.find(user => user.email === email);
-  console.log("Retrieved user data for email:", email, userData);
+  const userData = users.find(user => user.email.toLowerCase() === email.toLowerCase());
+  console.log("Retrieved user data for email:", email, userData ? "found" : "not found");
   return userData;
 };
 

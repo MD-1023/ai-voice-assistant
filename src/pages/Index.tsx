@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/sonner";
-import { saveUserData, getUserData, UserData } from "@/lib/api";
+import { saveUserData, getUserData } from "@/lib/api";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -24,13 +24,24 @@ const Index = () => {
       setEmail(savedEmail || "");
       
       // Check if this is a returning user with existing conversations
-      const userData = getUserData(savedEmail);
-      if (userData && userData.conversations.length > 0 && 
-          userData.conversations[userData.conversations.length - 1].messages.length > 0) {
-        setIsReturningUser(true);
-      }
+      checkIfReturningUser(savedEmail);
     }
   }, []);
+  
+  // Helper function to check if a user is returning with conversations
+  const checkIfReturningUser = (email: string) => {
+    const userData = getUserData(email);
+    if (userData) {
+      // Check if there are any actual conversations with messages
+      const hasConversations = userData.conversations.some(conversation => 
+        conversation.messages.filter(msg => msg.role !== "system").length > 0
+      );
+      
+      setIsReturningUser(hasConversations);
+    } else {
+      setIsReturningUser(false);
+    }
+  };
 
   const handleStartTalking = (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,11 +70,15 @@ const Index = () => {
         email,
         conversations: []
       };
+    } else {
+      // Update the name in case it changed
+      userData.name = name;
     }
     
-    // Add a new conversation if needed
+    // Add a new conversation if needed (or if the last one is empty)
+    const lastConversation = userData.conversations[userData.conversations.length - 1];
     if (!userData.conversations.length || 
-        userData.conversations[userData.conversations.length - 1].messages.length > 0) {
+        (lastConversation && lastConversation.messages.filter(msg => msg.role !== "system").length > 0)) {
       userData.conversations.push({
         date: new Date().toISOString(),
         messages: []
@@ -85,6 +100,13 @@ const Index = () => {
   
   const goToDashboard = () => {
     navigate("/dashboard");
+  };
+
+  // When email changes, check if it's a returning user
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setEmail(newEmail);
+    checkIfReturningUser(newEmail);
   };
 
   return (
@@ -136,16 +158,7 @@ const Index = () => {
                   type="email"
                   placeholder="john.smith@example.com"
                   value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    // Check if this is a returning user
-                    const userData = getUserData(e.target.value);
-                    setIsReturningUser(
-                      userData !== undefined && 
-                      userData.conversations.length > 0 && 
-                      userData.conversations[userData.conversations.length - 1].messages.length > 0
-                    );
-                  }}
+                  onChange={handleEmailChange}
                   required
                 />
               </div>

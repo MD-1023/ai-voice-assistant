@@ -32,54 +32,55 @@ export function useConversation({ name, email }: UseConversationProps) {
     // Get the current/last conversation
     const currentConversation = userData.conversations[userData.conversations.length - 1];
     if (currentConversation) {
-      // If there are existing messages, check if this is a returning user
+      // Check if this is a returning user with existing conversations
       if (currentConversation.messages.length > 0) {
-        // Extract the actual conversation messages (excluding the greeting)
+        // Extract conversation messages excluding system messages
         const actualMessages = currentConversation.messages.filter(
-          msg => !(msg.role === "assistant" && msg.content.startsWith(`Hello ${name}`))
+          msg => msg.role !== "system"
         );
         
-        setMessages(actualMessages);
-        
-        // Generate a welcome back message based on previous conversation
-        const previousTopics = extractConversationTopics(actualMessages);
-        previousTopicsRef.current = previousTopics;
-        
-        let welcomeBackMessage = `Hello ${name}! I remember our previous conversation`;
-        
-        if (previousTopics.length > 0) {
-          welcomeBackMessage += ` about ${previousTopics.join(", ")}. Would you like to continue that conversation or would you like assistance with something else?`;
-        } else {
-          welcomeBackMessage += `. Would you like to continue where we left off or would you like assistance with something else?`;
+        // Save the actual conversation messages but don't display yet
+        if (actualMessages.length > 0) {
+          setMessages([]);
+          previousTopicsRef.current = extractConversationTopics(actualMessages);
+          
+          // Generate personalized welcome back message
+          let welcomeBackMessage = `Hello ${name}! I remember our previous conversation`;
+          
+          if (previousTopicsRef.current.length > 0) {
+            welcomeBackMessage += ` about ${previousTopicsRef.current.join(", ")}. Would you like to continue that conversation or would you like assistance with something else?`;
+          } else {
+            welcomeBackMessage += `. Would you like to continue where we left off or would you like assistance with something else?`;
+          }
+          
+          const greetingMessage: Message = { role: "assistant", content: welcomeBackMessage };
+          
+          // Display only the greeting message to the user
+          setMessages([greetingMessage]);
+          
+          // Speak the welcome back message
+          setTimeout(() => {
+            speakText(welcomeBackMessage);
+          }, 300);
+          
+          return true;
         }
-        
-        const greetingMessage: Message = { role: "assistant", content: welcomeBackMessage };
-        
-        // Add greeting to UI messages but don't modify stored messages yet
-        setMessages(prevMessages => [greetingMessage, ...actualMessages]);
-        
-        // Speak the welcome back message
-        setTimeout(() => {
-          speakText(welcomeBackMessage);
-        }, 300);
-        
-        return true;
-      } else {
-        // If no messages yet, greet the user as new
-        const greeting = `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`;
-        const greetingMessage: Message = { role: "assistant", content: greeting };
-        
-        setMessages([greetingMessage]);
-        currentConversation.messages.push(greetingMessage);
-        saveUserData(userData);
-        
-        // Speak the greeting
-        setTimeout(() => {
-          speakText(greeting);
-        }, 300);
-        
-        return true;
       }
+      
+      // If no messages yet, greet the user as new
+      const greeting = `Hello ${name}! I am your AI Voice Assistant. How may I help you today?`;
+      const greetingMessage: Message = { role: "assistant", content: greeting };
+      
+      setMessages([greetingMessage]);
+      currentConversation.messages.push(greetingMessage);
+      saveUserData(userData);
+      
+      // Speak the greeting
+      setTimeout(() => {
+        speakText(greeting);
+      }, 300);
+      
+      return true;
     }
     return false;
   };
@@ -91,23 +92,39 @@ export function useConversation({ name, email }: UseConversationProps) {
     
     if (userMessages.length === 0) return [];
     
-    // Extract keywords from conversation
-    const keywords = ["password", "reset", "account", "login", "billing", "payment", "subscription", "cancel", "update", "problem"];
+    // Define keywords that represent common topics
+    const keywordMap: Record<string, string> = {
+      "password": "password reset",
+      "reset": "account resets",
+      "account": "account management",
+      "login": "login issues",
+      "billing": "billing questions",
+      "payment": "payment methods",
+      "subscription": "subscription details",
+      "cancel": "cancellation procedures",
+      "update": "account updates",
+      "problem": "technical issues",
+      "help": "customer support",
+      "question": "general inquiries",
+      "email": "email settings"
+    };
     
     const detectedTopics: string[] = [];
     
     // Look through all messages for keywords
     userMessages.forEach(message => {
       const messageContent = message.content.toLowerCase();
-      keywords.forEach(keyword => {
-        if (messageContent.includes(keyword) && !detectedTopics.includes(keyword)) {
-          detectedTopics.push(keyword);
+      
+      // Check for each keyword in the message
+      Object.entries(keywordMap).forEach(([keyword, topic]) => {
+        if (messageContent.includes(keyword) && !detectedTopics.includes(topic)) {
+          detectedTopics.push(topic);
         }
       });
     });
     
     // If no specific topics detected, use the last message content
-    if (detectedTopics.length === 0) {
+    if (detectedTopics.length === 0 && userMessages.length > 0) {
       const lastMessage = userMessages[userMessages.length - 1].content;
       // Get first 3-5 words as a topic
       const words = lastMessage.split(" ");
@@ -115,7 +132,7 @@ export function useConversation({ name, email }: UseConversationProps) {
       return ['"' + simpleTopic + '..."'];
     }
     
-    return detectedTopics;
+    return detectedTopics.slice(0, 3); // Limit to 3 topics max
   };
 
   const handleAudioSubmission = async (audioBlob: Blob) => {
