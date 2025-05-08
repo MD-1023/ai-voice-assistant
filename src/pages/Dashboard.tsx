@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Activity, Users, FileQuestion, MessageCircle } from "lucide-react";
-import { getAnalytics, getFAQs, getUsersData } from "@/lib/api";
+import { getAnalytics, getFAQs } from "@/lib/analytics";
+import { getUsersData } from "@/lib/userData";
 import AnalyticsCard from "@/components/AnalyticsCard";
 
 const Dashboard = () => {

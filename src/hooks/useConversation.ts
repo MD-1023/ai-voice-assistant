@@ -1,16 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { 
-  transcribeAudio, 
-  getAIResponse, 
-  textToSpeech, 
-  getUserData, 
-  saveUserData,
-  saveAnalytics,
-  saveFAQ,
-  extractTopicsFromMessages,
   Message,
   cleanTextForSpeech
-} from "@/lib/api";
+} from "@/lib/types";
+import { transcribeAudio } from "@/lib/speechToText";
+import { getAIResponse } from "@/lib/aiResponse";
+import { textToSpeech } from "@/lib/textToSpeech";
+import { getUserData, saveUserData } from "@/lib/userData";
+import { saveAnalytics, saveFAQ, extractTopicsFromMessages } from "@/lib/analytics";
 import { toast } from "@/components/ui/sonner";
 
 interface UseConversationProps {

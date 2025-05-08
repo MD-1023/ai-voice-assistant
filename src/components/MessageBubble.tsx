@@ -1,7 +1,7 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { Message } from "@/lib/api";
+import { Message } from "@/lib/types";
 
 interface MessageBubbleProps {
   content: string;

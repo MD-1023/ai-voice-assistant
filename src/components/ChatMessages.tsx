@@ -2,7 +2,7 @@
 import React, { useRef, useEffect } from "react";
 import MessageBubble from "@/components/MessageBubble";
 import AudioVisualizer from "@/components/AudioVisualizer";
-import { Message } from "@/lib/api";
+import { Message } from "@/lib/types";
 
 interface ChatMessagesProps {
   messages: Message[];
