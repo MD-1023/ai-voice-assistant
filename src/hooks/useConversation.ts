@@ -8,7 +8,8 @@ import {
   saveAnalytics,
   saveFAQ,
   extractTopicsFromMessages,
-  Message
+  Message,
+  cleanTextForSpeech
 } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 
@@ -327,23 +328,6 @@ export function useConversation({ name, email }: UseConversationProps) {
     }
   };
   
-  // Clean text for speech by removing special characters that shouldn't be spoken
-  const cleanTextForSpeech = (text: string): string => {
-    // Remove asterisks (markdown bold/italics)
-    let cleanedText = text.replace(/\*/g, "");
-    
-    // Remove quotes that would be spoken
-    cleanedText = cleanedText.replace(/["']/g, "");
-    
-    // Remove markdown links and keep only the text
-    cleanedText = cleanedText.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-    
-    // Remove other special characters that might be incorrectly spoken
-    cleanedText = cleanedText.replace(/[_#>`]/g, "");
-    
-    return cleanedText;
-  };
-
   const cleanup = () => {
     if (audioSourceRef.current) {
       try {
