@@ -1,9 +1,10 @@
+
 import { toast } from "@/components/ui/sonner";
 
 // API configuration
-const DEEPGRAM_API_KEY = "0655664639c1a9b1d5adb9c9f1ed19cf10257348";
-const OPENAI_API_KEY = "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";
-const ELEVENLABS_API_KEY = "sk_daa1ffbe11bd110b007ac32fdcf02bcfb6ad74d7329becd3";
+const DEEPGRAM_API_KEY = "98cd0f8512f4819f289a5db105a8cf087d3b4b1b";
+const OPENAI_API_KEY = "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";
+const ELEVENLABS_API_KEY = "sk_53cf2b4248a93dbf9f1b1c59f9c7c5c9be6abff9212155f7";
 
 // Define system prompt for OpenAI
 const SYSTEM_PROMPT = `
@@ -325,3 +326,4 @@ export const extractTopicsFromMessages = (messages: Message[]): string[] => {
   // Get unique topics
   return Array.from(new Set(topics));
 };
+
