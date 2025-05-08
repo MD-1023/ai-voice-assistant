@@ -1,11 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { 
-  Message,
-  cleanTextForSpeech
-} from "@/lib/types";
+import { Message } from "@/lib/types";
 import { transcribeAudio } from "@/lib/speechToText";
 import { getAIResponse } from "@/lib/aiResponse";
-import { textToSpeech } from "@/lib/textToSpeech";
+import { textToSpeech, cleanTextForSpeech } from "@/lib/textToSpeech";
 import { getUserData, saveUserData } from "@/lib/userData";
 import { saveAnalytics, saveFAQ, extractTopicsFromMessages } from "@/lib/analytics";
 import { toast } from "@/components/ui/sonner";
