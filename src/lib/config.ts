@@ -28,6 +28,12 @@ export const updateApiKeys = ({
     DEEPGRAM_API_KEY = deepgramKey;
     localStorage.setItem("deepgram_api_key", deepgramKey);
   }
+
+  // Log to help with debugging
+  console.log("API Keys updated:");
+  console.log("OpenAI:", OPENAI_API_KEY.substring(0, 10) + "...");
+  console.log("ElevenLabs:", ELEVENLABS_API_KEY.substring(0, 10) + "...");
+  console.log("Deepgram:", DEEPGRAM_API_KEY.substring(0, 10) + "...");
 };
 
 // Define system prompt for OpenAI

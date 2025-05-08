@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { PhoneOff } from "lucide-react";
+import { PhoneOff, Settings } from "lucide-react";
 import ApiKeyConfig from "./ApiKeyConfig";
 
 interface ChatHeaderProps {

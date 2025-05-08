@@ -13,8 +13,22 @@ const ApiKeyConfig = () => {
   const [deepgramKey, setDeepgramKey] = useState(DEEPGRAM_API_KEY || "");
   const [open, setOpen] = useState(false);
 
+  // Validate OpenAI key format
+  const validateOpenAIKey = (key: string) => {
+    if (!key) return false;
+    if (key.startsWith("sk-proj-")) {
+      return false; // Project-based keys may not work correctly
+    }
+    return key.startsWith("sk-");
+  };
+
   // Save the API keys
   const handleSave = () => {
+    // Check OpenAI key format
+    if (openaiKey && !validateOpenAIKey(openaiKey)) {
+      toast.warning("Your OpenAI API key format looks incorrect. Keys typically start with 'sk-' (not 'sk-proj-')");
+    }
+    
     updateApiKeys({
       openaiKey: openaiKey,
       elevenLabsKey: elevenLabsKey,
@@ -47,9 +61,15 @@ const ApiKeyConfig = () => {
               value={openaiKey} 
               onChange={(e) => setOpenaiKey(e.target.value)} 
               placeholder="sk-..." 
+              className={openaiKey && !validateOpenAIKey(openaiKey) ? "border-red-500" : ""}
             />
+            {openaiKey && !validateOpenAIKey(openaiKey) && (
+              <p className="text-xs text-red-500 mt-1">
+                Warning: Key format looks incorrect. Standard OpenAI keys start with "sk-" (not "sk-proj-")
+              </p>
+            )}
             <p className="text-xs text-muted-foreground mt-1">
-              Required for AI responses
+              Required for AI responses. Must be a standard OpenAI API key starting with "sk-"
             </p>
           </div>
 
@@ -86,6 +106,10 @@ const ApiKeyConfig = () => {
           <Button onClick={handleSave} className="w-full mt-4">
             Save API Keys
           </Button>
+
+          <p className="text-xs text-muted-foreground mt-2">
+            Note: After updating keys, you may need to refresh the page or start a new conversation.
+          </p>
         </div>
       </DialogContent>
     </Dialog>
