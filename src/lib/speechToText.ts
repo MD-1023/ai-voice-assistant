@@ -5,6 +5,12 @@ import { DEEPGRAM_API_KEY } from './config';
 // Speech to text with Deepgram
 export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
   try {
+    // Check if API key is available
+    if (!DEEPGRAM_API_KEY) {
+      toast.error("Missing Deepgram API key. Please configure in settings.");
+      throw new Error("Missing Deepgram API key");
+    }
+
     const formData = new FormData();
     formData.append("audio", audioBlob);
 
@@ -17,6 +23,15 @@ export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Deepgram API error:", response.status, errorText);
+      
+      if (response.status === 401) {
+        toast.error("Invalid Deepgram API key. Please update in settings.");
+      } else {
+        toast.error(`Failed to transcribe audio: ${response.status}`);
+      }
+      
       throw new Error(`Failed to transcribe audio: ${response.status}`);
     }
 
@@ -24,7 +39,7 @@ export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
     return data.results.channels[0].alternatives[0].transcript || "";
   } catch (error) {
     console.error("Error transcribing audio:", error);
-    toast.error("Failed to transcribe audio. Please try again.");
+    toast.error("Failed to transcribe audio. Please try again or check API key.");
     return "";
   }
 };

@@ -1,8 +1,34 @@
 
 // API configuration
-export const DEEPGRAM_API_KEY = "98cd0f8512f4819f289a5db105a8cf087d3b4b1b";
-export const OPENAI_API_KEY = "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";
-export const ELEVENLABS_API_KEY = "sk_53cf2b4248a93dbf9f1b1c59f9c7c5c9be6abff9212155f7";
+export let DEEPGRAM_API_KEY = localStorage.getItem("deepgram_api_key") || "98cd0f8512f4819f289a5db105a8cf087d3b4b1b";
+export let OPENAI_API_KEY = localStorage.getItem("openai_api_key") || "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";
+export let ELEVENLABS_API_KEY = localStorage.getItem("elevenlabs_api_key") || "sk_53cf2b4248a93dbf9f1b1c59f9c7c5c9be6abff9212155f7";
+
+// Function to update API keys at runtime
+export const updateApiKeys = ({ 
+  openaiKey, 
+  elevenLabsKey, 
+  deepgramKey 
+}: { 
+  openaiKey: string; 
+  elevenLabsKey: string; 
+  deepgramKey: string 
+}) => {
+  if (openaiKey) {
+    OPENAI_API_KEY = openaiKey;
+    localStorage.setItem("openai_api_key", openaiKey);
+  }
+  
+  if (elevenLabsKey) {
+    ELEVENLABS_API_KEY = elevenLabsKey;
+    localStorage.setItem("elevenlabs_api_key", elevenLabsKey);
+  }
+  
+  if (deepgramKey) {
+    DEEPGRAM_API_KEY = deepgramKey;
+    localStorage.setItem("deepgram_api_key", deepgramKey);
+  }
+};
 
 // Define system prompt for OpenAI
 export const SYSTEM_PROMPT = `

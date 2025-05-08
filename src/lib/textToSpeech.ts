@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/sonner";
 import { ELEVENLABS_API_KEY } from './config';
 
@@ -18,36 +19,43 @@ export const cleanTextForSpeech = (text: string): string => {
   return cleanedText;
 };
 
-// Text to speech with ElevenLabs - modified to handle quota errors better
+// Fallback for browser's built-in TTS
+const useFallbackTTS = (message: string): Promise<ArrayBuffer> => {
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance(message);
+    const voices = window.speechSynthesis.getVoices();
+    // Try to find a good voice
+    const preferredVoice = voices.find(voice => 
+      voice.name.includes('Female') || 
+      voice.name.includes('Google') || 
+      voice.name.includes('Samantha')
+    );
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+    
+    // Create a simple audio sample to return
+    const audioContext = new AudioContext();
+    const emptyBuffer = audioContext.createBuffer(1, 1, 22050);
+    const arrayBuffer = emptyBuffer.getChannelData(0).buffer;
+    resolve(arrayBuffer);
+  });
+};
+
+// Text to speech with ElevenLabs
 export const textToSpeech = async (text: string): Promise<ArrayBuffer> => {
   try {
-    // Fallback for ElevenLabs API issues - using browser's built-in TTS
-    const useFallbackTTS = (message: string): Promise<ArrayBuffer> => {
-      return new Promise((resolve) => {
-        const utterance = new SpeechSynthesisUtterance(message);
-        const voices = window.speechSynthesis.getVoices();
-        // Try to find a good voice
-        const preferredVoice = voices.find(voice => 
-          voice.name.includes('Female') || 
-          voice.name.includes('Google') || 
-          voice.name.includes('Samantha')
-        );
-        
-        if (preferredVoice) {
-          utterance.voice = preferredVoice;
-        }
-        
-        utterance.rate = 1;
-        utterance.pitch = 1;
-        window.speechSynthesis.speak(utterance);
-        
-        // Create a simple audio sample to return
-        const audioContext = new AudioContext();
-        const emptyBuffer = audioContext.createBuffer(1, 1, 22050);
-        const arrayBuffer = emptyBuffer.getChannelData(0).buffer;
-        resolve(arrayBuffer);
-      });
-    };
+    // Check if API key is available or valid
+    if (!ELEVENLABS_API_KEY || ELEVENLABS_API_KEY === "sk_53cf2b4248a93dbf9f1b1c59f9c7c5c9be6abff9212155f7") {
+      console.log("Using fallback TTS - No valid ElevenLabs API key");
+      toast.info("Using browser's text-to-speech. Configure ElevenLabs key for better quality.");
+      return await useFallbackTTS(text);
+    }
     
     try {
       const cleanedText = cleanTextForSpeech(text);
@@ -72,8 +80,17 @@ export const textToSpeech = async (text: string): Promise<ArrayBuffer> => {
       });
 
       if (!response.ok) {
-        console.error("ElevenLabs error, using fallback:", await response.text());
-        toast.info("Using browser's text-to-speech due to API limitations.");
+        const errorText = await response.text();
+        console.error("ElevenLabs error, using fallback:", errorText);
+        
+        if (errorText.includes("quota_exceeded")) {
+          toast.info("ElevenLabs quota exceeded. Using browser's text-to-speech instead.");
+        } else if (errorText.includes("detected_unusual_activity")) {
+          toast.info("ElevenLabs detected unusual activity. Using browser's text-to-speech instead.");
+        } else {
+          toast.info("Using browser's text-to-speech due to API limitations.");
+        }
+        
         return await useFallbackTTS(cleanedText);
       }
 
